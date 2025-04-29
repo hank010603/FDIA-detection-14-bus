@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Power Grid Monitoring with FDIA Detection</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/luxon@3.0.1"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.2.0"></script>
+    <style>
+        :root {
+            --primary: #4361ee;
+            --primary-dark: #3a56d4;
+            --secondary: #3f37c9;
+            --danger: #f72585;
+            --warning: #f8961e;
+            --success: #4cc9f0;
+            --dark: #212529;
+            --light: #f8f9fa;
+            --gray: #6c757d;
+            --gray-light: #e9ecef;
+            --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f5f7ff;
+            color: var(--dark);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: var(--card-shadow);
+            margin-bottom: 24px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+        }
+
+
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-title h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+        }
+
+        .header-title i {
+            font-size: 1.5rem;
+        }
+
+        .status-badge {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .status-badge.connected {
+            background-color: rgba(76, 201, 240, 0.2);
+        }
+
+        .status-badge.disconnected {
+            background-color: rgba(247, 37, 133, 0.2);
+        }
+
+    
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 24px;
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: var(--card-shadow);
+            transition: var(--transition);
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-title i {
+            font-size: 1rem;
+        }
+
+        select {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid var(--gray-light);
+            background-color: white;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem;
+            transition: var(--transition);
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            background-size: 16px;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.2);
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--gray-light);
+        }
+
+        .status-indicator:last-child {
+            border-bottom: none;
+        }
+
+        .status-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.95rem;
+        }
+
+        .status-value {
+            font-weight: 600;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .status-dot.normal {
+            background-color: var(--success);
+        }
+
+        .status-dot.warning {
+            background-color: var(--warning);
+        }
+
+        .status-dot.danger {
+            background-color: var(--danger);
+        }
+
+        .probability-meter {
+            height: 10px;
+            background-color: var(--gray-light);
+            border-radius: 5px;
+            margin-top: 12px;
+            overflow: hidden;
+        }
+
+        .probability-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--warning), var(--danger));
+            width: 0%;
+            transition: var(--transition);
+        }
+
+        .attack-alert {
+            background-color: rgba(247, 37, 133, 0.1);
+            border-left: 4px solid var(--danger);
+            padding: 16px;
+            margin-bottom: 24px;
+            border-radius: 0 8px 8px 0;
+            display: none;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { background-color: rgba(247, 37, 133, 0.1); }
+            50% { background-color: rgba(247, 37, 133, 0.2); }
+            100% { background-color: rgba(247, 37, 133, 0.1); }
+        }
+
+        .attack-alert.active {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .alert-icon {
+            font-size: 1.5rem;
+            color: var(--danger);
+        }
+
+        .alert-content h3 {
+            color: var(--danger);
+            margin-bottom: 4px;
+            font-size: 1rem;
+        }
+
+        .alert-content p {
+            font-size: 0.9rem;
+            color: var(--dark);
+        }
+
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+
+        .chart-container {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: var(--card-shadow);
+        }
+
+        .chart-container h2 {
+            font-size: 1.2rem;
+            margin-bottom: 16px;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .chart-container h2 i {
+            font-size: 1rem;
+        }
+
+        canvas {
+            width: 100% !important;
+            height: 300px !important;
+        }
+
+        .last-update {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .update-time {
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .refresh-btn {
+            background: none;
+            border: none;
+            color: var(--primary);
+            cursor: pointer;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: var(--transition);
+        }
+
+        .refresh-btn:hover {
+            color: var(--primary-dark);
+        }
+
+        @media (max-width: 1200px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+            
+            .grid-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .dos-alert {
+    display: none; 
+    background-color: rgba(248, 150, 30, 0.1);
+    border-left: 4px solid var(--warning);
+    padding: 16px;
+    margin-bottom: 24px;
+    border-radius: 0 8px 8px 0;
+    align-items: center;
+    gap: 12px;
+}
+
+.dos-alert.active {
+    display: flex;
+}
+
+@keyframes dos-pulse {
+    0% { background-color: rgba(248, 150, 30, 0.1); }
+    50% { background-color: rgba(248, 150, 30, 0.3); }
+    100% { background-color: rgba(248, 150, 30, 0.1); }
+}
+
+.dos-icon {
+    font-size: 1.5rem;
+    color: var(--warning);
+}
+
+.alert-content h3 {
+    color: var(--warning);
+    margin-bottom: 4px;
+    font-size: 1rem;
+}
+
+.alert-content p {
+    font-size: 0.9rem;
+    color: var(--dark);
+}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-title">
+                <i class="fas fa-bolt"></i>
+                <h1>Power Grid Monitoring with FDIA Detection</h1>
+            </div>
+            <div id="connectionStatus" class="status-badge disconnected">
+                <i class="fas fa-plug"></i>
+                <span>Disconnected</span>
+            </div>
+        </div>
+        
+        <div id="attackAlert" class="attack-alert">
+            <div class="alert-icon">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <div class="alert-content">
+                <h3>⚠️ FDIA ATTACK DETECTED!</h3>
+                <p>A potential False Data Injection Attack has been detected in the power grid measurements.</p>
+            </div>
+        </div>
+
+        <div id="dosAlert" class="dos-alert">
+            <div class="alert-icon dos-icon">
+                <i class="fas fa-exclamation-circle"></i>
+            </div>
+            <div class="alert-content">
+                <h3>⚠️ POTENTIAL DOS ATTACK DETECTED!</h3>
+                <p>Voltage has been zero for an extended period, indicating a possible Denial of Service attack.</p>
+            </div>
+        </div>
+        
+        <div class="dashboard">
+            <div class="sidebar">
+                <div class="card">
+                    <h3 class="card-title">
+                        <i class="fas fa-bus"></i>
+                        Bus Selection
+                    </h3>
+                    <label for="busSelect">Select Bus:</label>
+                    <select id="busSelect"></select>
+                </div>
+                
+                <div class="card">
+                    <h3 class="card-title">
+                        <i class="fas fa-heartbeat"></i>
+                        System Status
+                    </h3>
+                    
+                   
+                    
+                    <div class="status-indicator">
+                        <span class="status-label">
+                            <div id="attackStatusDot" class="status-dot normal"></div>
+                            FDIA Detection
+                        </span>
+                        <span id="attackStatus" class="status-value">Normal</span>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h3 class="card-title">
+                        <i class="fas fa-shield-alt"></i>
+                        FDIA Score
+                    </h3>
+                    <div class="status-value" id="attackProbability">0%</div>
+                    <div class="probability-meter">
+                        <div id="probabilityBar" class="probability-bar"></div>
+                    </div>
+          
+                </div>
+                
+                <div class="card">
+                    <div class="last-update">
+                        <h3 class="card-title">
+                            <i class="fas fa-clock"></i>
+                            Last Update
+                        </h3>
+                        <button class="refresh-btn" onclick="location.reload()">
+                            <i class="fas fa-sync-alt"></i>
+                            Refresh
+                        </button>
+                    </div>
+                    <div class="update-time" id="lastUpdate">-</div>
+                </div>
+            </div>
+            
+            <div class="main-content">
+                <div class="grid-container">
+                    <div class="chart-container">
+                        <h2><i class="fas fa-bolt"></i> Voltage Monitoring</h2>
+                        <canvas id="voltageChart"></canvas>
+                    </div>
+                    
+                    <div class="chart-container">
+                        <h2><i class="fas fa-tachometer-alt"></i> Current Monitoring</h2>
+                        <canvas id="currentChart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="chart-container">
+                    <h2><i class="fas fa-history"></i> FDIA Score History</h2>
+                    <canvas id="detectionChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+     
+        const MAX_POINTS = 100;
+        const PHASE_COLORS = ['rgb(255, 0, 0)', 'rgb(0, 128, 0)', 'rgb(0, 0, 255)']; 
+        const PHASE_NAMES = ['Phase A (Red)', 'Phase B (Green)', 'Phase C (Blue)'];
+        const DOS_THRESHOLD = 5; 
+        
+        
+        let voltageData = Array(14).fill().map(() => []);
+        let currentData = Array(14).fill().map(() => []);
+        let detectionData = [];
+        let timestamps = [];
+        let selectedBus = 0;
+        let socket;
+        let voltageChart, currentChart, detectionChart;
+        const ZERO_VOLTAGE_THRESHOLD = 0.01; 
+        let zeroVoltageCounts = Array(14).fill(0); 
+
+        let dosDetectedBuses = Array(14).fill(false); 
+        
+        
+        function initCharts() {
+           
+            const commonOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: {
+                    duration: 1000
+                },
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: {
+                            unit: 'second',
+                            displayFormats: {
+                                second: 'HH:mm:ss'
+                            }
+                        },
+                        grid: {
+                            display: false
+                        },
+                        ticks: {
+                            color: '#6c757d'
+                        }
+                    },
+                    y: {
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.05)'
+                        },
+                        ticks: {
+                            color: '#6c757d'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            usePointStyle: true,
+                            padding: 20,
+                            color: '#212529'
+                        }
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleFont: {
+                            size: 14,
+                            weight: 'bold'
+                        },
+                        bodyFont: {
+                            size: 12
+                        },
+                        padding: 12,
+                        usePointStyle: true
+                    }
+                },
+                interaction: {
+                    intersect: false,
+                    mode: 'nearest'
+                }
+            };
+
+         
+            voltageChart = new Chart(
+                document.getElementById('voltageChart'),
+                {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: PHASE_COLORS.map((color, i) => ({
+                            label: PHASE_NAMES[i],
+                            data: [],
+                            borderColor: color,
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            tension: 0.1,
+                            fill: false,
+                            pointRadius: 0,
+                            pointHoverRadius: 5
+                        }))
+                    },
+                    options: {
+                        ...commonOptions,
+                        scales: {
+                            ...commonOptions.scales,
+                            y: {
+                                ...commonOptions.scales.y,
+                                min: -3,
+                                max: 3,
+                                title: { 
+                                    display: true,
+                                    text: 'Voltage (pu)',
+                                    color: '#6c757d'
+                                }
+                            }
+                        }
+                    }
+                }
+            );
+
+            currentChart = new Chart(
+                document.getElementById('currentChart'),
+                {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: PHASE_COLORS.map((color, i) => ({
+                            label: PHASE_NAMES[i],
+                            data: [],
+                            borderColor: color,
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            tension: 0.1,
+                            fill: false,
+                            pointRadius: 0,
+                            pointHoverRadius: 5
+                        }))
+                    },
+                    options: {
+                        ...commonOptions,
+                        scales: {
+                            ...commonOptions.scales,
+                            y: {
+                                ...commonOptions.scales.y,
+                                min: -1,
+                                max: 1,
+                                title: { 
+                                    display: true,
+                                    text: 'Current (A)',
+                                    color: '#6c757d'
+                                }
+                            }
+                        }
+                    }
+                }
+            );
+
+           
+            detectionChart = new Chart(
+                document.getElementById('detectionChart'),
+                {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: [{
+                            label: 'FDIA Score',
+                            data: [],
+                            borderColor: '#f72585',
+                            backgroundColor: 'rgba(247, 37, 133, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.1,
+                            fill: true,
+                            pointRadius: 0,
+                            pointHoverRadius: 5
+                        }]
+                    },
+                    options: {
+                        ...commonOptions,
+                        scales: {
+                            ...commonOptions.scales,
+                            y: {
+                                ...commonOptions.scales.y,
+                                min: 0,
+                                max: 100,
+                                ticks: {
+                                    callback: function(value) {
+                                        return value;
+                                    }
+                                },
+                                title: { 
+                                    display: true,
+                                    text: 'Score',
+                                    color: '#6c757d'
+                                }
+                            }
+                        },
+                        plugins: {
+                            ...commonOptions.plugins,
+                            tooltip: {
+                                ...commonOptions.plugins.tooltip,
+                                callbacks: {
+                                    label: function(context) {
+                                        return context.dataset.label + ': ' + context.parsed.y.toFixed(1) ;
+                                    }
+                                }
+                            },
+                            annotation: {
+                                annotations: {
+                                    thresholdLine: {
+                                        type: 'line',
+                                        yMin: 70,
+                                        yMax: 70,
+                                        borderColor: '#f8961e',
+                                        borderWidth: 2,
+                                        borderDash: [6, 6],
+                                        label: {
+                                            content: 'Warning Threshold (70%)',
+                                            enabled: true,
+                                            position: 'left',
+                                            backgroundColor: 'rgba(248, 150, 30, 0.2)',
+                                            color: '#f8961e',
+                                            font: {
+                                                weight: 'bold'
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            );
+        }
+        
+      
+        function updateCharts() {
+           
+            for (let phase = 0; phase < 3; phase++) {
+                voltageChart.data.datasets[phase].data = 
+                    voltageData[selectedBus].map(point => point[phase]);
+            }
+            voltageChart.data.labels = timestamps;
+            voltageChart.update('none');
+            
+      
+            for (let phase = 0; phase < 3; phase++) {
+                currentChart.data.datasets[phase].data = 
+                    currentData[selectedBus].map(point => point[phase]);
+            }
+            currentChart.data.labels = timestamps;
+            currentChart.update('none');
+            
+       
+            detectionChart.data.datasets[0].data = detectionData.map(d => d.probability * 100);
+            detectionChart.data.labels = detectionData.map(d => d.timestamp);
+            detectionChart.update();
+            
+           
+            const now = new Date();
+            document.getElementById('lastUpdate').textContent = now.toLocaleTimeString();
+        }
+        
+       
+        function initBusSelector() {
+            const select = document.getElementById('busSelect');
+            for (let i = 0; i < 14; i++) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = `Bus ${i+1}`;
+                select.appendChild(option);
+            }
+            
+            select.addEventListener('change', (e) => {
+                selectedBus = parseInt(e.target.value);
+                updateCharts();
+            });
+        }
+        
+
+         
+          function checkForDos(bus, voltageReadings) {
+            
+            const allZero = voltageReadings.every(v => Math.abs(v) < ZERO_VOLTAGE_THRESHOLD);
+            
+            if (allZero) {
+                zeroVoltageCounts[bus]++;
+                
+               
+                if (zeroVoltageCounts[bus] >= DOS_THRESHOLD && !dosDetectedBuses[bus]) {
+                    dosDetectedBuses[bus] = true;
+                    showDosAlert(bus, true);
+                    console.warn(`DOS ATTACK DETECTED on Bus ${bus+1}! Voltage has been zero for ${zeroVoltageCounts[bus]} consecutive readings.`);
+                }
+            } else {
+             
+                if (zeroVoltageCounts[bus] > 0) {
+                    zeroVoltageCounts[bus] = 0;
+                    
+                   
+                    if (dosDetectedBuses[bus]) {
+                        dosDetectedBuses[bus] = false;
+                        showDosAlert(bus, false);
+                        console.log(`DOS condition cleared on Bus ${bus+1}`);
+                    }
+                }
+            }
+        }
+
+        
+   
+        function updateAttackDetection(isAttack, probability) {
+            
+            
+            probability = Math.min(1.0, Math.max(0, probability));
+            const probabilityPercent = Math.round(probability * 100);
+            
+            document.getElementById('attackProbability').textContent = `${probabilityPercent}`;
+           
+            
+            const probabilityBar = document.getElementById('probabilityBar');
+    
+   
+    void probabilityBar.offsetWidth;
+    
+
+    probabilityBar.style.width = `${probabilityPercent}%`;
+            
+            const attackAlert = document.getElementById('attackAlert');
+            const attackDot = document.getElementById('attackStatusDot');
+            const attackStatus = document.getElementById('attackStatus');
+            
+            if (isAttack && probability > 0.85) {
+                attackAlert.classList.add('active');
+                attackDot.className = 'status-dot danger';
+                attackStatus.textContent = 'Danger';
+                attackStatus.style.color = 'var(--danger)';
+            } else if (probability > 0.75 && probability<=0.85 ) {
+                attackAlert.classList.remove('active');
+                attackDot.className = 'status-dot warning';
+                attackStatus.textContent = 'Warning';
+                attackStatus.style.color = 'var(--warning)';
+            } else {
+                attackAlert.classList.remove('active');
+                attackDot.className = 'status-dot normal';
+                attackStatus.textContent = 'Normal';
+                attackStatus.style.color = 'var(--success)';
+            }
+        }
+
+      
+        
+       
+        function connectWebSocket() {
+            socket = new WebSocket('ws://localhost:8765');
+            
+            socket.onopen = () => {
+                console.log("WebSocket connection established");
+                document.getElementById('connectionStatus').innerHTML = '<i class="fas fa-plug"></i><span>Connected</span>';
+                document.getElementById('connectionStatus').className = 'status-badge connected';
+            };
+            
+            socket.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    const now = new Date();
+                    
+
+                    timestamps.push(now);
+                    if (timestamps.length > MAX_POINTS) timestamps.shift();
+                    
+               
+                    for (let bus = 0; bus < 14; bus++) {
+                        const phases = data.data.V.slice(bus*3, bus*3+3);
+                        if (phases.length === 3) {
+                            voltageData[bus].push(phases);
+                            if (voltageData[bus].length > MAX_POINTS) voltageData[bus].shift();
+
+                            checkForDos(bus,phases)
+                        }
+                    }
+                    
+                 
+                    for (let bus = 0; bus < 14; bus++) {
+                        const phases = data.data.I.slice(bus*3, bus*3+3);
+                        if (phases.length === 3) {
+                            currentData[bus].push(phases);
+                            if (currentData[bus].length > MAX_POINTS) currentData[bus].shift();
+                        }
+                    }
+                    
+                   
+                    if (data.detection) {
+                        
+                        const probability = Math.min(1.0, Math.max(0, data.detection.probability));
+                        detectionData.push({
+                            probability: probability,
+                            timestamp: now
+                        });
+                        if (detectionData.length > MAX_POINTS) detectionData.shift();
+                        
+                        updateAttackDetection(data.detection.is_attack, probability);
+                    }
+                    
+                    updateCharts();
+                } catch (e) {
+                    console.error('Error processing WebSocket data:', e);
+                }
+            };
+            
+            socket.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                document.getElementById('connectionStatus').innerHTML = '<i class="fas fa-plug"></i><span>Error</span>';
+                document.getElementById('connectionStatus').className = 'status-badge disconnected';
+            };
+            
+            socket.onclose = () => {
+                console.log('WebSocket connection closed - attempting reconnect in 1 second');
+                document.getElementById('connectionStatus').innerHTML = '<i class="fas fa-plug"></i><span>Disconnected</span>';
+                document.getElementById('connectionStatus').className = 'status-badge disconnected';
+                setTimeout(connectWebSocket, 1000);
+            };
+        }
+        
+        function showDosAlert(bus, show) {
+    const alertElement = document.getElementById('dosAlert');
+ 
+    
+    if (!alertElement) {
+        console.error('DOS alert element not found in DOM');
+        return;
+    }
+
+    if (show) {
+     
+       
+        
+       
+        alertElement.style.display = 'flex';
+        alertElement.classList.add('active');
+        
+      
+        alertElement.style.animation = 'dos-pulse 2s infinite';
+        
+    
+        void alertElement.offsetWidth;
+    } else {
+        
+        alertElement.style.display = 'none';
+        alertElement.classList.remove('active');
+        
+       
+        alertElement.style.animation = 'none';
+    }
+}
+       
+        window.addEventListener('load', () => {
+            initBusSelector();
+            initCharts();
+            connectWebSocket();
+        });
+    </script>
+</body>
+</html>
